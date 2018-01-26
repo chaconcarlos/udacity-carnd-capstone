@@ -52,11 +52,11 @@ class DBWNode(object):
   def __init__(self):
     rospy.init_node('dbw_node')
 
-    self.initialize_vehicle()
+    rospy.loginfo("DBWNode - Initializing drive-by-wire node...")
 
-    self.steer_pub    = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size = 1)
-    self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size = 1)
-    self.brake_pub    = rospy.Publisher('/vehicle/brake_cmd',    BrakeCmd,    queue_size = 1)
+    rospy.logdebug("DBWNode - Initializing variables...")
+
+    self.initialize_vehicle()
 
     self.controller         = Controller(self.vehicle)
     self.current_speed      = None
@@ -66,10 +66,20 @@ class DBWNode(object):
     self.dbw_enabled        = False
     self.previous_timestamp = None
 
+    rospy.logdebug("DBWNode - Suscribing to channels...")
+
     rospy.Subscriber('/current_velocity',    TwistStamped, self.current_velocity_cb)
     rospy.Subscriber('/twist_cmd',           TwistStamped, self.twist_cmd_cb)
     rospy.Subscriber('/vehicle/dbw_enabled', Bool,         self.dbw_enabled_cb)
+
+    rospy.logdebug("DBWNode - Creating required publishers...")
+
+    self.steer_pub    = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size = 1)
+    self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size = 1)
+    self.brake_pub    = rospy.Publisher('/vehicle/brake_cmd',    BrakeCmd,    queue_size = 1)
     
+    rospy.loginfo("DBWNode - Drive-by-wire node initialization finished.")
+
     self.loop()
 
   def initialize_vehicle(self):
@@ -114,6 +124,7 @@ class DBWNode(object):
       self.previous_timestamp = current_timestamp
       
       if (self.dbw_enabled and is_data_complete()):
+        rospy.logdebug("DBWNode - Computing controls...")
         throttle, brake, steer = self.controller.control(self.target_speed, self.target_yaw, self.current_speed, sample_time)
         self.publish(throttle, brake, steer)
       else:
@@ -122,6 +133,9 @@ class DBWNode(object):
       rate.sleep()
 
   def publish(self, throttle, brake, steer):
+    rospy.logdebug("DBWNode - Publishing controls...")
+    rospy.logdebug("DBWNode - Throttle: %s, Brake: %s, Steer: %s", throttle, brake, steer)
+
     tcmd                = ThrottleCmd()
     tcmd.enable         = True
     tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT

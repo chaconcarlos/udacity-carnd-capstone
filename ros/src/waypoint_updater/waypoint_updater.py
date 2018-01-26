@@ -131,7 +131,7 @@ class WaypointUpdater(object):
     _, _, yaw  = tf.transformations.euler_from_quaternion(quaternion)
     angle      = abs(yaw - heading)
 
-    if angle > NEXT_WAYPOINT_MAX_ANGLE:        
+    if (angle > NEXT_WAYPOINT_MAX_ANGLE):
       closest_index += 1
     
     return closest_index
@@ -162,7 +162,6 @@ class WaypointUpdater(object):
 
     lane                 = Lane()
     lane.header.frame_id = '/world'
-    #lane.header.stamp    = rospy.get_time(0)
     lane.waypoints       = future_waypoints
 
     self.final_waypoints_pub.publish(lane)
