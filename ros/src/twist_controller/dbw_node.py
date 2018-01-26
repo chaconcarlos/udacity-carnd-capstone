@@ -52,11 +52,13 @@ class DBWNode(object):
   def __init__(self):
     rospy.init_node('dbw_node')
 
+    self.initialize_vehicle()
+
     self.steer_pub    = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size = 1)
     self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size = 1)
     self.brake_pub    = rospy.Publisher('/vehicle/brake_cmd',    BrakeCmd,    queue_size = 1)
 
-    self.controller         = TwistController(self.vehicle)
+    self.controller         = Controller(self.vehicle)
     self.current_speed      = None
     self.current_yaw        = None
     self.target_speed       = None
@@ -67,8 +69,7 @@ class DBWNode(object):
     rospy.Subscriber('/current_velocity',    TwistStamped, self.current_velocity_cb)
     rospy.Subscriber('/twist_cmd',           TwistStamped, self.twist_cmd_cb)
     rospy.Subscriber('/vehicle/dbw_enabled', Bool,         self.dbw_enabled_cb)
-
-    self.initialize_vehicle()
+    
     self.loop()
 
   def initialize_vehicle(self):
@@ -96,7 +97,7 @@ class DBWNode(object):
     self.dbw_enabled = msg.data
 
   def is_data_complete(self):
-    return self.target_speed != None && self.target_yaw != None && self.current_speed != None
+    return self.target_speed != None and self.target_yaw != None and self.current_speed != None
 
   def loop(self):
     rate = rospy.Rate(LOOP_RATE)
@@ -105,15 +106,14 @@ class DBWNode(object):
       sample_time       = None
       current_timestamp = rospy.get_time()
       
-      if (self.previous_timestamp == None)
+      if (self.previous_timestamp == None):
         sample_time = DEFAULT_SAMPLE_TIME
-      else
-        duration    = current_timestamp - self.previous_timestamp
-        sample_time = duration.to_sec()
+      else:
+        sample_time = current_timestamp - self.previous_timestamp
       
       self.previous_timestamp = current_timestamp
       
-      if (self.dbw_enabled && is_data_complete()):
+      if (self.dbw_enabled and is_data_complete()):
         throttle, brake, steer = self.controller.control(self.target_speed, self.target_yaw, self.current_speed, sample_time)
         self.publish(throttle, brake, steer)
       else:

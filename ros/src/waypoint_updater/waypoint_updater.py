@@ -2,9 +2,11 @@
 
 import math
 import rospy
-from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg   import Lane, Waypoint
+import tf
 
+from geometry_msgs.msg import PoseStamped
+from styx_msgs.msg     import Lane, Waypoint
+from std_msgs.msg      import Int32
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -31,7 +33,7 @@ def to_km(miles):
 
 class WaypointUpdater(object):
   def __init__(self):
-    rospy.init_node('waypoint_updater')
+    rospy.init_node('waypoint_updater', log_level = rospy.DEBUG)
 
     rospy.loginfo("WaypointUpdater - Initializing waypoint updater...")
 
@@ -39,7 +41,7 @@ class WaypointUpdater(object):
 
     rospy.Subscriber('/current_pose',      PoseStamped, self.pose_cb)
     rospy.Subscriber('/base_waypoints',    Lane,        self.waypoints_cb)
-    rospy.Subscriber('/traffic_waypoint',  PoseStamped, self.traffic_cb)
+    rospy.Subscriber('/traffic_waypoint',  Int32,       self.traffic_cb)
     rospy.Subscriber('/obstacle_waypoint', Lane,        self.obstacle_cb)
 
     rospy.logdebug("WaypointUpdater - Creating required publishers...")
@@ -59,16 +61,16 @@ class WaypointUpdater(object):
     rospy.spin()
 
   def pose_cb(self, msg):
-    rospy.logdebug("WaypointUpdater - New pose received. Pose: (%s, %s, %s)", msg.pose.x, msg.pose.y, msg.pose.z)
+    rospy.logdebug("WaypointUpdater - New pose received. Pose: (%s, %s, %s)", msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
     self.current_pose = msg.pose
-    publish()
+    self.publish()
     pass
 
   def waypoints_cb(self, lane):
     rospy.logdebug("WaypointUpdater - Received new set of base waypoints. Waypoints count: %s", len(lane.waypoints))
     self.waypoints       = lane.waypoints
     self.waypoints_count = len(self.waypoints)
-    publish()
+    self.publish()
     pass
 
   def traffic_cb(self, msg):
@@ -87,7 +89,7 @@ class WaypointUpdater(object):
 
   def distance(self, waypoints, wp1, wp2):
     dist = 0
-    dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+    dl   = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
     
     for i in range(wp1, wp2+1):
       dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
@@ -99,25 +101,27 @@ class WaypointUpdater(object):
     return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2  + (p1.z - p2.z) ** 2)
 
   def get_closest_waypoint_index(self):
-    current_min_distance   = DISTANCE_TO_CLOSEST
-    current_waypoint_index = 0
-    current_position       = self.current_pose.position
+    current_min_distance = DISTANCE_TO_CLOSEST
+    closest_index        = 0
+    current_position     = self.current_pose.position
 
     for index, waypoint in enumerate(self.waypoints):
-        distance = distance(current_position, waypoint.pose.pose.position)
+        distance = self.distance(current_position, waypoint.pose.pose.position)
 
         if (distance < current_min_distance):
-            current_min_distance   = distance
-            current_waypoint_index = index
+            current_min_distance = distance
+            closest_index        = index
+
+    return closest_index
 
   def get_next_waypoint_index(self):
-    closest_index = self.get_closest_waypoint_index(pose, waypoints)
+    closest_index = self.get_closest_waypoint_index()
 
-    if (closest_index == self.waypoints_count - 1)
+    if (closest_index == self.waypoints_count - 1):
       return None
 
-    closest_x   = waypoints[closest_index].pose.pose.position.x
-    closest_y   = waypoints[closest_index].pose.pose.position.y
+    closest_x   = self.waypoints[closest_index].pose.pose.position.x
+    closest_y   = self.waypoints[closest_index].pose.pose.position.y
     current_x   = self.current_pose.position.x
     current_y   = self.current_pose.position.y
     orientation = self.current_pose.orientation
@@ -133,12 +137,12 @@ class WaypointUpdater(object):
     return closest_index
 
   def publish(self):
-    if self.waypoints = None or self.current_pose = None:
+    if (self.waypoints == None or self.current_pose == None):
       return
 
     next_waypoint_index = self.get_next_waypoint_index()
 
-    if (next_waypoint_index == None)
+    if (next_waypoint_index == None):
       rospy.loginfo("WaypointUpdater -Destination reached.")
       return
 
@@ -146,19 +150,19 @@ class WaypointUpdater(object):
 
     look_ahead_index = next_waypoint_index + LOOKAHEAD_WPS
 
-    if (look_ahead_index >= self.waypoints_count)
+    if (look_ahead_index >= self.waypoints_count):
       look_ahead_index = self.waypoints_count - 1
 
-        future_waypoints = self.waypoints[next_waypoint_index : look_ahead_index]
+    future_waypoints = self.waypoints[next_waypoint_index : look_ahead_index]
 
     for i in range(len(future_waypoints)):
-      set_waypoint_velocity(future_waypoints[i], self.target_speed)
+      self.set_waypoint_velocity(future_waypoints[i], self.target_speed)
 
     rospy.logdebug("WaypointUpdater - Publishing %s waypoints...", len(future_waypoints))
 
     lane                 = Lane()
     lane.header.frame_id = '/world'
-    lane.header.stamp    = rospy.get_time()
+    #lane.header.stamp    = rospy.get_time(0)
     lane.waypoints       = future_waypoints
 
     self.final_waypoints_pub.publish(lane)
