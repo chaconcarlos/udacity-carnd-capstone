@@ -3,7 +3,7 @@
 import math
 import rospy
 from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg	 import Lane, Waypoint
+from styx_msgs.msg   import Lane, Waypoint
 
 
 '''
@@ -21,135 +21,150 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS           = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS           = 200
 DISTANCE_TO_CLOSEST     = 100000
 NEXT_WAYPOINT_MAX_ANGLE = math.pi / 4
 TARGET_SPEED_MPH        = 10
 
 def to_km(miles):
-	return (miles * 1609.34) / (60 * 60)
+  return (miles * 1609.34) / (60 * 60)
 
 class WaypointUpdater(object):
-	def __init__(self):
-		rospy.init_node('waypoint_updater')
+  def __init__(self):
+    rospy.init_node('waypoint_updater')
 
-		rospy.Subscriber('/current_pose',      PoseStamped, self.pose_cb)
-		rospy.Subscriber('/base_waypoints',    Lane,		self.waypoints_cb)
-		rospy.Subscriber('/traffic_waypoint',  PoseStamped, self.traffic_cb)
-		rospy.Subscriber('/obstacle_waypoint', Lane,		self.obstacle_cb)
+    rospy.loginfo("WaypointUpdater - Initializing waypoint updater...")
 
-		self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
+    rospy.logdebug("WaypointUpdater - Suscribing to channels...")
 
-		# TODO: Add other member variables you need below
+    rospy.Subscriber('/current_pose',      PoseStamped, self.pose_cb)
+    rospy.Subscriber('/base_waypoints',    Lane,        self.waypoints_cb)
+    rospy.Subscriber('/traffic_waypoint',  PoseStamped, self.traffic_cb)
+    rospy.Subscriber('/obstacle_waypoint', Lane,        self.obstacle_cb)
 
-		self.current_pose           = None
-		self.waypoints              = None
-		self.target_speed           = to_km(TARGET_SPEED_MPH)
-		self.is_destination_reached = False
+    rospy.logdebug("WaypointUpdater - Creating required publishers...")
 
-		rospy.spin()
+    self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-	def pose_cb(self, msg):
-		self.current_pose = msg.pose
-		publish()
-		pass
+    rospy.logdebug("WaypointUpdater - Initializing variables...")
 
-	def waypoints_cb(self, lane):
-		self.waypoints       = lane.waypoints
-		self.waypoints_count = len(self.waypoints)
-		publish()
-		pass
+    self.current_pose           = None
+    self.waypoints              = None
+    self.target_speed           = to_km(TARGET_SPEED_MPH)
+    self.is_destination_reached = False
 
-	def traffic_cb(self, msg):
-		# TODO: Callback for /traffic_waypoint message. Implement
-		pass
+    rospy.logdebug("WaypointUpdater - Set target_speed to %s. km/h", self.target_speed)
+    rospy.loginfo("WaypointUpdater - Waypoint updater initialization finished.")
 
-	def obstacle_cb(self, msg):
-		# TODO: Callback for /obstacle_waypoint message. We will implement it later
-		pass
+    rospy.spin()
 
-	def get_waypoint_velocity(self, waypoint):
-		return waypoint.twist.twist.linear.x
+  def pose_cb(self, msg):
+    rospy.logdebug("WaypointUpdater - New pose received. Pose: (%s, %s, %s)", msg.pose.x, msg.pose.y, msg.pose.z)
+    self.current_pose = msg.pose
+    publish()
+    pass
 
-	def set_waypoint_velocity(self, waypoint, velocity):
-		waypoint.twist.twist.linear.x = velocity
+  def waypoints_cb(self, lane):
+    rospy.logdebug("WaypointUpdater - Received new set of base waypoints. Waypoints count: %s", len(lane.waypoints))
+    self.waypoints       = lane.waypoints
+    self.waypoints_count = len(self.waypoints)
+    publish()
+    pass
 
-	def distance(self, waypoints, wp1, wp2):
-		dist = 0
-		dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-	  
-		for i in range(wp1, wp2+1):
-			dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
-	   		wp1 = i
+  def traffic_cb(self, msg):
+    # TODO: Callback for /traffic_waypoint message. Implement
+    pass
 
-		return dist
+  def obstacle_cb(self, msg):
+    # TODO: Callback for /obstacle_waypoint message. We will implement it later
+    pass
 
-	def distance(self, p1, p2):
-		return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2  + (p1.z - p2.z) ** 2)
+  def get_waypoint_velocity(self, waypoint):
+    return waypoint.twist.twist.linear.x
 
-	def get_closest_waypoint_index(self):
-        current_min_distance   = DISTANCE_TO_CLOSEST
-        current_waypoint_index = 0
- 		current_position       = self.current_pose.position
+  def set_waypoint_velocity(self, waypoint, velocity):
+    waypoint.twist.twist.linear.x = velocity
 
-        for index, waypoint in enumerate(self.waypoints):
-            distance = distance(current_position, waypoint.pose.pose.position)
+  def distance(self, waypoints, wp1, wp2):
+    dist = 0
+    dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+    
+    for i in range(wp1, wp2+1):
+      dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
+      wp1 = i
 
-            if (distance < current_min_distance):
-                current_min_distance   = distance
-                current_waypoint_index = index
+    return dist
 
-	def get_next_waypoint_index(self):
-        closest_index = self.get_closest_waypoint_index(pose, waypoints)
+  def distance(self, p1, p2):
+    return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2  + (p1.z - p2.z) ** 2)
 
-        if (closest_index == self.waypoints_count - 1)
-        	return None
+  def get_closest_waypoint_index(self):
+    current_min_distance   = DISTANCE_TO_CLOSEST
+    current_waypoint_index = 0
+    current_position       = self.current_pose.position
 
-        closest_x   = waypoints[closest_index].pose.pose.position.x
-        closest_y   = waypoints[closest_index].pose.pose.position.y
-        current_x   = self.current_pose.position.x
-        current_y   = self.current_pose.position.y
-        orientation = self.current_pose.orientation
+    for index, waypoint in enumerate(self.waypoints):
+        distance = distance(current_position, waypoint.pose.pose.position)
 
-        heading    = math.atan2((closest_y - current_y), (closest_x - current_x))
-        quaternion = (orientation.x, orientation.y, orientation.z, orientation.w)
-        _, _, yaw  = tf.transformations.euler_from_quaternion(quaternion)
-        angle      = abs(yaw - heading)
+        if (distance < current_min_distance):
+            current_min_distance   = distance
+            current_waypoint_index = index
 
-        if angle > NEXT_WAYPOINT_MAX_ANGLE:        
-        	closest_index += 1
-        
-        return closest_index
+  def get_next_waypoint_index(self):
+    closest_index = self.get_closest_waypoint_index(pose, waypoints)
 
-	def publish(self):
-		if self.waypoints = None or self.current_pose = None:
-			return
+    if (closest_index == self.waypoints_count - 1)
+      return None
 
-		next_waypoint_index = self.get_next_waypoint_index()
+    closest_x   = waypoints[closest_index].pose.pose.position.x
+    closest_y   = waypoints[closest_index].pose.pose.position.y
+    current_x   = self.current_pose.position.x
+    current_y   = self.current_pose.position.y
+    orientation = self.current_pose.orientation
 
-		if (next_waypoint_index == None)
-			rospy.loginfo("Destination reached.")
-			return
+    heading    = math.atan2((closest_y - current_y), (closest_x - current_x))
+    quaternion = (orientation.x, orientation.y, orientation.z, orientation.w)
+    _, _, yaw  = tf.transformations.euler_from_quaternion(quaternion)
+    angle      = abs(yaw - heading)
 
-		look_ahead_index = next_waypoint_index + LOOKAHEAD_WPS
+    if angle > NEXT_WAYPOINT_MAX_ANGLE:        
+      closest_index += 1
+    
+    return closest_index
 
-		if (look_ahead_index >= self.waypoints_count)
-			look_ahead_index = self.waypoints_count - 1
+  def publish(self):
+    if self.waypoints = None or self.current_pose = None:
+      return
+
+    next_waypoint_index = self.get_next_waypoint_index()
+
+    if (next_waypoint_index == None)
+      rospy.loginfo("WaypointUpdater -Destination reached.")
+      return
+
+    rospy.logdebug("WaypointUpdater - Publishing...")
+
+    look_ahead_index = next_waypoint_index + LOOKAHEAD_WPS
+
+    if (look_ahead_index >= self.waypoints_count)
+      look_ahead_index = self.waypoints_count - 1
 
         future_waypoints = self.waypoints[next_waypoint_index : look_ahead_index]
 
-		for i in range(len(future_waypoints)):
-			set_waypoint_velocity(future_waypoints[i], self.target_speed)
+    for i in range(len(future_waypoints)):
+      set_waypoint_velocity(future_waypoints[i], self.target_speed)
 
-		lane                 = Lane()
-		lane.header.frame_id = '/world'
-		lane.header.stamp    = rospy.get_time()
-		lane.waypoints       = lookahead_waypoints
+    rospy.logdebug("WaypointUpdater - Publishing %s waypoints...", len(future_waypoints))
 
-		self.final_waypoints_pub.publish(lane)
+    lane                 = Lane()
+    lane.header.frame_id = '/world'
+    lane.header.stamp    = rospy.get_time()
+    lane.waypoints       = future_waypoints
+
+    self.final_waypoints_pub.publish(lane)
 
 if __name__ == '__main__':
-	try:
-		WaypointUpdater()
-	except rospy.ROSInterruptException:
-		rospy.logerr('Could not start waypoint updater node.')
+  try:
+    WaypointUpdater()
+  except rospy.ROSInterruptException:
+    rospy.logerr('Could not start waypoint updater node.')
