@@ -31,96 +31,116 @@ that we have created in the `__init__` function.
 
 '''
 
-LOOP_RATE = 50 # 50Hz
+LOOP_RATE           = 50 # 50Hz
+DEFAULT_SAMPLE_TIME = 1 / LOOP_RATE 
 
 class Vehicle(object):
-    def __init__(self):
-        self.vehicle_mass    = None
-        self.fuel_capacity   = None
-        self.brake_deadband  = None
-        self.decel_limit     = None
-        self.accel_limit     = None
-        self.wheel_radius    = None
-        self.wheel_base      = None
-        self.steer_ratio     = None
-        self.max_lat_accel   = None
-        self.max_steer_angle = None
-        self.min_speed       = None
+  def __init__(self):
+    self.vehicle_mass    = None
+    self.fuel_capacity   = None
+    self.brake_deadband  = None
+    self.decel_limit     = None
+    self.accel_limit     = None
+    self.wheel_radius    = None
+    self.wheel_base      = None
+    self.steer_ratio     = None
+    self.max_lat_accel   = None
+    self.max_steer_angle = None
+    self.min_speed       = None
 
 class DBWNode(object):
-    def __init__(self):
-        rospy.init_node('dbw_node')
+  def __init__(self):
+    rospy.init_node('dbw_node')
 
-        self.steer_pub    = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size = 1)
-        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size = 1)
-        self.brake_pub    = rospy.Publisher('/vehicle/brake_cmd',    BrakeCmd,    queue_size = 1)
+    self.steer_pub    = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size = 1)
+    self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size = 1)
+    self.brake_pub    = rospy.Publisher('/vehicle/brake_cmd',    BrakeCmd,    queue_size = 1)
 
-        self.controller         = TwistController(self.vehicle)
-        self.current_speed      = None
-        self.current_yaw        = None
-        self.target_speed       = None
-        self.target_yaw         = None
-        self.dbw_enabled        = None
-        self.previous_timestamp = rospy.get_time()
+    self.controller         = TwistController(self.vehicle)
+    self.current_speed      = None
+    self.current_yaw        = None
+    self.target_speed       = None
+    self.target_yaw         = None
+    self.dbw_enabled        = False
+    self.previous_timestamp = None
 
-        rospy.Subscriber('/current_velocity',    TwistStamped, self.current_velocity_cb)
-        rospy.Subscriber('/twist_cmd',           TwistStamped, self.twist_cmd_cb)
-        rospy.Subscriber('/vehicle/dbw_enabled', Bool,         self.dbw_enabled_cb)
+    rospy.Subscriber('/current_velocity',    TwistStamped, self.current_velocity_cb)
+    rospy.Subscriber('/twist_cmd',           TwistStamped, self.twist_cmd_cb)
+    rospy.Subscriber('/vehicle/dbw_enabled', Bool,         self.dbw_enabled_cb)
 
-        self.initialize_vehicle()
-        self.loop()
+    self.initialize_vehicle()
+    self.loop()
 
-    def initialize_vehicle(self):
-        self.vehicle                 = Vehicle()
-        self.vehicle.vehicle_mass    = rospy.get_param('~vehicle_mass',    1736.35)
-        self.vehicle.fuel_capacity   = rospy.get_param('~fuel_capacity',   13.5)
-        self.vehicle.brake_deadband  = rospy.get_param('~brake_deadband',  .1)
-        self.vehicle.decel_limit     = rospy.get_param('~decel_limit',     -5)
-        self.vehicle.accel_limit     = rospy.get_param('~accel_limit',     1.)
-        self.vehicle.wheel_radius    = rospy.get_param('~wheel_radius',    0.2413)
-        self.vehicle.wheel_base      = rospy.get_param('~wheel_base',      2.8498)
-        self.vehicle.steer_ratio     = rospy.get_param('~steer_ratio',     14.8)
-        self.vehicle.max_lat_accel   = rospy.get_param('~max_lat_accel',   3.)
-        self.vehicle.max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
+  def initialize_vehicle(self):
+    self.vehicle                 = Vehicle()
+    self.vehicle.vehicle_mass    = rospy.get_param('~vehicle_mass',    1736.35)
+    self.vehicle.fuel_capacity   = rospy.get_param('~fuel_capacity',   13.5)
+    self.vehicle.brake_deadband  = rospy.get_param('~brake_deadband',  .1)
+    self.vehicle.decel_limit     = rospy.get_param('~decel_limit',     -5)
+    self.vehicle.accel_limit     = rospy.get_param('~accel_limit',     1.)
+    self.vehicle.wheel_radius    = rospy.get_param('~wheel_radius',    0.2413)
+    self.vehicle.wheel_base      = rospy.get_param('~wheel_base',      2.8498)
+    self.vehicle.steer_ratio     = rospy.get_param('~steer_ratio',     14.8)
+    self.vehicle.max_lat_accel   = rospy.get_param('~max_lat_accel',   3.)
+    self.vehicle.max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
 
-    def current_velocity_cb(self, msg):
-        self.current_speed = msg.twist.linear.x
-        self.current_yaw   = msg.twist.angular.z
+  def current_velocity_cb(self, msg):
+    self.current_speed = msg.twist.linear.x
+    self.current_yaw   = msg.twist.angular.z
 
-    def twist_cmd_cb(self, msg):
-        self.target_speed = msg.twist.linear.x
-        self.target_yaw   = msg.twist.angular.z
+  def twist_cmd_cb(self, msg):
+    self.target_speed = msg.twist.linear.x
+    self.target_yaw   = msg.twist.angular.z
 
-    def dbw_enabled_cb(self, msg):
-        self.dbw_enabled = msg.data
+  def dbw_enabled_cb(self, msg):
+    self.dbw_enabled = msg.data
 
-    def loop(self):
-        rate = rospy.Rate(LOOP_RATE)
-        while not rospy.is_shutdown():
-            if self.dbw_enabled:
-                throttle, brake, steer = self.controller.control(self.target_speed, self.target_yaw, self.current_speed)
-                self.publish(throttle, brake, steer)
-            else:
-                self.controller.reset()
-            rate.sleep()
+  def is_data_complete(self):
+    return self.target_speed != None && self.target_yaw != None && self.current_speed != None
 
-    def publish(self, throttle, brake, steer):
-        tcmd                = ThrottleCmd()
-        tcmd.enable         = True
-        tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
-        tcmd.pedal_cmd      = throttle
-        self.throttle_pub.publish(tcmd)
+  def loop(self):
+    rate = rospy.Rate(LOOP_RATE)
+    
+    while not rospy.is_shutdown():
+      sample_time       = None
+      current_timestamp = rospy.get_time()
+      
+      if (self.previous_timestamp == None)
+        sample_time = DEFAULT_SAMPLE_TIME
+      else
+        duration    = current_timestamp - self.previous_timestamp
+        sample_time = duration.to_sec()
+      
+      self.previous_timestamp = current_timestamp
+      
+      if (self.dbw_enabled && is_data_complete()):
+        throttle, brake, steer = self.controller.control(self.target_speed, self.target_yaw, self.current_speed, sample_time)
+        self.publish(throttle, brake, steer)
+      else:
+        self.controller.reset()
+        
+      rate.sleep()
 
-        scmd                          = SteeringCmd()
-        scmd.enable                   = True
-        scmd.steering_wheel_angle_cmd = steer
-        self.steer_pub.publish(scmd)
+  def publish(self, throttle, brake, steer):
+    tcmd                = ThrottleCmd()
+    tcmd.enable         = True
+    tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
+    tcmd.pedal_cmd      = throttle
+    
+    self.throttle_pub.publish(tcmd)
 
-        bcmd                = BrakeCmd()
-        bcmd.enable         = True
-        bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
-        bcmd.pedal_cmd      = brake
-        self.brake_pub.publish(bcmd)
+    scmd                          = SteeringCmd()
+    scmd.enable                   = True
+    scmd.steering_wheel_angle_cmd = steer
+    
+    self.steer_pub.publish(scmd)
+
+    bcmd                = BrakeCmd()
+    bcmd.enable         = True
+    bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
+    bcmd.pedal_cmd      = brake
+    
+    self.brake_pub.publish(bcmd)
 
 if __name__ == '__main__':
-    DBWNode()
+  DBWNode()

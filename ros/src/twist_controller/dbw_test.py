@@ -2,11 +2,10 @@
 
 import os
 import csv
-
 import rospy
-from std_msgs.msg import Bool
-from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 
+from std_msgs.msg     import Bool
+from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 
 '''
 You can use this file to test your DBW code against a bag recorded with a reference implementation.
@@ -19,7 +18,6 @@ performing on various commands.
 
 '''
 
-
 class DBWTestNode(object):
     def __init__(self):
         rospy.init_node('dbw_test_node')
@@ -27,11 +25,9 @@ class DBWTestNode(object):
         rospy.Subscriber('/vehicle/steering_cmd', SteeringCmd, self.steer_cb)
         rospy.Subscriber('/vehicle/throttle_cmd', ThrottleCmd, self.throttle_cb)
         rospy.Subscriber('/vehicle/brake_cmd', BrakeCmd, self.brake_cb)
-
         rospy.Subscriber('/actual/steering_cmd', SteeringCmd, self.actual_steer_cb)
         rospy.Subscriber('/actual/throttle_cmd', ThrottleCmd, self.actual_throttle_cb)
         rospy.Subscriber('/actual/brake_cmd', BrakeCmd, self.actual_brake_cb)
-
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
 
         self.steer = self.throttle = self.brake = None
