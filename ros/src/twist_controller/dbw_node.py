@@ -50,7 +50,7 @@ class Vehicle(object):
 
 class DBWNode(object):
   def __init__(self):
-    rospy.init_node('dbw_node')
+    rospy.init_node('dbw_node', log_level = rospy.DEBUG)
 
     rospy.loginfo("DBWNode - Initializing drive-by-wire node...")
 
@@ -96,10 +96,16 @@ class DBWNode(object):
     self.vehicle.max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
 
   def current_velocity_cb(self, msg):
+    if (self.dbw_enabled):
+      rospy.logdebug("DBWNode - Received current velocity message. Linear speed: %s, Angular speed: %s", msg.twist.linear.x, msg.twist.angular.z)
+
     self.current_speed = msg.twist.linear.x
     self.current_yaw   = msg.twist.angular.z
 
   def twist_cmd_cb(self, msg):
+    if (self.dbw_enabled):
+      rospy.logdebug("DBWNode - Received twist command. Target linear speed: %s, Target angular speed: %s", msg.twist.linear.x, msg.twist.angular.z)
+
     self.target_speed = msg.twist.linear.x
     self.target_yaw   = msg.twist.angular.z
 
@@ -123,11 +129,12 @@ class DBWNode(object):
       
       self.previous_timestamp = current_timestamp
       
-      if (self.dbw_enabled and is_data_complete()):
+      if (self.dbw_enabled and self.is_data_complete()):
         rospy.logdebug("DBWNode - Computing controls...")
-        throttle, brake, steer = self.controller.control(self.target_speed, self.target_yaw, self.current_speed, sample_time)
+        throttle, brake, steer = self.controller.get_controls(self.current_speed, self.target_speed, self.target_yaw, sample_time)
         self.publish(throttle, brake, steer)
-      else:
+      elif (self.dbw_enabled == False):
+        #rospy.logdebug("DBWNode - DBW disabled. Resetting the controller.") 
         self.controller.reset()
         
       rate.sleep()
