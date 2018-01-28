@@ -237,8 +237,6 @@ class WaypointUpdater(object):
       waypoint_velocity = min(self.current_velocity + (i + 1) * MAX_ACCELERATION, self.target_velocity)
       self.set_waypoint_velocity(future_waypoints[i], waypoint_velocity)
 
-    #rospy.logdebug("WaypointUpdater - Publishing %s waypoints...", len(future_waypoints))
-
     lane                 = Lane()
     lane.header.frame_id = '/world'
     lane.header.stamp    = rospy.Time(0)
