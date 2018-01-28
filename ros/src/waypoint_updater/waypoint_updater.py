@@ -46,7 +46,7 @@ def to_meters_per_second(kilometers_per_hour):
 
 class WaypointUpdater(object):
   """
-  Class that implements the route planning, updating from the current car position and speed,
+  Implements the route planning, updating from the current car position and speed,
   obstacles and traffic lights.
   """
 
