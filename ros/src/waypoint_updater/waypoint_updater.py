@@ -175,9 +175,8 @@ class WaypointUpdater(object):
     current_min_distance = DISTANCE_TO_CLOSEST
     closest_index        = self.last_closest_index
     current_position     = self.current_pose.position
-    elements_count       = self.map_waypoints_count - closest_index
 
-    for i in range(elements_count):
+    for i in range(self.map_waypoints_count - closest_index):
       index             = self.last_closest_index + i
       waypoint_position = self.map_waypoints[index].pose.pose.position 
       distance          = self.get_distance(current_position, waypoint_position)
