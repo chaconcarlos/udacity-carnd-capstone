@@ -163,7 +163,7 @@ class WaypointUpdater(object):
     y_coefficient = (position_1.y - position_2.y) ** 2
     z_coefficient = (position_1.z - position_2.z) ** 2
 
-    return x_coefficient + y_coefficient  + z_coefficient
+    return math.sqrt(x_coefficient + y_coefficient + z_coefficient)
 
   def get_closest_waypoint_index(self):
     """
