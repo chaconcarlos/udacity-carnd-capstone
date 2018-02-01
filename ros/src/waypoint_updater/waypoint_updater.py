@@ -137,10 +137,6 @@ class WaypointUpdater(object):
     self.map_waypoints       = lane.waypoints
     self.map_waypoints_count = len(self.map_waypoints)
 
-    # TODO: Remove!!!
-    self.map_waypoints       = self.map_waypoints[ : 600]
-    self.map_waypoints_count = len(self.map_waypoints)
-
   def on_traffic_waypoint_received(self, msg):
     """
     Handles the event when the a traffic waypoint has been received.
@@ -261,7 +257,7 @@ class WaypointUpdater(object):
       velocity = math.sqrt(2 * MAX_DECELERATION * distance)
 
       if (velocity < 1):
-      	velocity = 0
+      	velocity = 0.0
 
       set_waypoint_velocity(waypoint, velocity)
 
