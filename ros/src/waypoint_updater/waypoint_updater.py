@@ -30,7 +30,7 @@ STOP_DISTANCE               = 40
 METERS_PER_KILOMETER        = 1000
 SECONDS_PER_HOUR            = 3600
 MAX_ACCELERATION            = 1.0 # 8 m/s2 by a rate of 10 Hz
-MAX_DECELERATION            = 2   # m/s2
+MAX_DECELERATION            = 0.5   # m/s2
 NEXT_WAYPOINT_MAX_ANGLE     = math.pi / 4
 
 def to_meters_per_second(kilometers_per_hour):
@@ -135,6 +135,10 @@ class WaypointUpdater(object):
         lane (Lane): The message with the set of base waypoints.
     """
     self.map_waypoints       = lane.waypoints
+    self.map_waypoints_count = len(self.map_waypoints)
+
+    # TODO: Remove!!!
+    self.map_waypoints       = self.map_waypoints[ : 600]
     self.map_waypoints_count = len(self.map_waypoints)
 
   def on_traffic_waypoint_received(self, msg):
@@ -248,13 +252,17 @@ class WaypointUpdater(object):
     Sets the target velocity of the waypoints decelerating to stop in the last waypoint.
 
     Args:
-        waypoints        (List): [out] The waypoints.
+        waypoints (List): [out] The waypoints.
     """
     stop_position = waypoints[len(waypoints) - 1].pose.pose.position
 
     for waypoint in waypoints:
       distance = get_distance(waypoint.pose.pose.position, stop_position)               
       velocity = math.sqrt(2 * MAX_DECELERATION * distance)
+
+      if (velocity < 1):
+      	velocity = 0
+
       set_waypoint_velocity(waypoint, velocity)
 
   def publish(self):

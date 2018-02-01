@@ -5,10 +5,17 @@ from lowpass        import LowPassFilter
 from yaw_controller import YawController
 
 GAS_DENSITY = 2.858
-ONE_MPH     = 0.44704
 
 class Controller(object):
+  """
+  Implements the controller that computes the values for 
+  throttle, brake and steering.
+  """
+
   def __init__(self, vehicle):
+    """
+    Initializes an instance of the Controller class.
+    """
     self.vehicle        = vehicle
     self.pid_controller = PID(kp = 0.2, ki = 0.005, kd = 0.1, mn = vehicle.decel_limit, mx = vehicle.accel_limit)
     self.steer_lpf      = LowPassFilter(tau = 3, ts = 1)
@@ -23,6 +30,9 @@ class Controller(object):
     self.vehicle_total_mass = self.vehicle.vehicle_mass + self.vehicle.fuel_capacity * GAS_DENSITY
 
   def reset(self):
+    """
+    Resets the controller.
+    """
     self.pid_controller.reset()
 
   def get_brake_torque(self, acceleration):
@@ -54,7 +64,12 @@ class Controller(object):
   
   def get_controls(self, current_speed, target_speed, target_yaw, sample_time):
     # Return throttle, brake, steer
-    steer           = self.get_steering(target_speed, target_yaw, current_speed)
-    throttle, brake = self.get_dynamics(current_speed, target_speed, sample_time)
+    steer = self.get_steering(target_speed, target_yaw, current_speed)
+
+    if (current_speed < 1 and target_speed == 0):
+      throttle = 0
+      brake    = 2000
+    else:
+      throttle, brake = self.get_dynamics(current_speed, target_speed, sample_time)
     
     return throttle, brake, steer
