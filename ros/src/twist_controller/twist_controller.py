@@ -113,7 +113,7 @@ class Controller(object):
 
     if (current_speed < 1 and target_speed == 0):
       throttle = 0
-      brake    = 2000
+      brake    = 200
     else:
       throttle, brake = self.get_dynamics(current_speed, target_speed, sample_time)
     
