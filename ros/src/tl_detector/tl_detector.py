@@ -51,6 +51,8 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
+        self.has_image = False
+        self.start()
         #rospy.spin()
 
     def pose_cb(self, msg):
@@ -85,7 +87,7 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
-	rospy.loginfo("tl_detector - publishing state: %s light_wp %s", state, light_wp)
+	#rospy.loginfo("tl_detector - publishing state: %s light_wp %s", state, light_wp)
         if self.state != state:
             self.state_count = 0
             self.state = state
@@ -215,15 +217,15 @@ class TLDetector(object):
         return -1, TrafficLight.UNKNOWN
 
     def start(self):
-      rospy.loginfo("Traffic Light Detector - Starting")
-      rate = rospy.Rate(LOOP_RATE)
-      while not rospy.is_shutdown():
-        self.publish()
-        rate.sleep()
+        rospy.loginfo("Traffic Light Detector - Starting")
+        rate = rospy.Rate(LOOP_RATE)
+        while not rospy.is_shutdown():
+            if self.has_image:
+                self.publish()
+            rate.sleep()
 
 if __name__ == '__main__':
     try:
-        tl_detector = TLDetector()
-	tl_detector.start()
+        TLDetector()
     except rospy.ROSInterruptException:
         rospy.logerr('Could not start traffic node.')
