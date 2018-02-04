@@ -11,9 +11,16 @@ import tf
 import cv2
 import yaml
 import math
+import rospkg
+import os
+import time
 
 STATE_COUNT_THRESHOLD = 3
 LOOP_RATE = 20
+
+CAPTURE_IMAGE = True
+NUM_OF_IMAGE = 100
+VISIBLE_TL_DIST = 200
 
 class TLDetector(object):
     def __init__(self):
@@ -52,6 +59,22 @@ class TLDetector(object):
         self.state_count = 0
 
         self.has_image = False
+        if CAPTURE_IMAGE:
+            self.num_of_red = 0
+            self.num_of_yellow = 0
+            self.num_of_green = 0
+            self.num_of_unknown = 0
+            self.last_time = time.time()
+            rospack = rospkg.RosPack()
+            run_dir = rospack.get_path('tl_detector')
+            self.image_dir = os.path.join(run_dir, 'image')
+            if not os.path.exists(self.image_dir):
+                os.makedirs(self.image_dir)
+                os.makedirs(os.path.join(self.image_dir, 'RED'))
+                os.makedirs(os.path.join(self.image_dir, 'YELLOW'))
+                os.makedirs(os.path.join(self.image_dir, 'GREEN'))
+                os.makedirs(os.path.join(self.image_dir, 'UNKNOWN'))
+
         self.start()
         #rospy.spin()
 
@@ -137,7 +160,40 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
+        dist = self.calculate_distance(self.pose.pose.position.x, light.pose.pose.position.x, self.pose.pose.position.y, light.pose.pose.position.y)
+        if dist > VISIBLE_TL_DIST:
+            return TrafficLight.UNKNOWN
+
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+        if CAPTURE_IMAGE:
+            is_enough = False
+            st = time.time()
+            if st - self.last_time >= 1:
+                self.last_time = st
+		if light.state == TrafficLight.RED:
+		    image_path = os.path.join(os.path.join(self.image_dir, 'RED'), '{0}.jpg'.format(st))
+                    self.num_of_red = self.num_of_red + 1
+                    if self.num_of_red > NUM_OF_IMAGE:
+                        is_enough = True
+		elif light.state == TrafficLight.YELLOW:
+		    image_path = os.path.join(os.path.join(self.image_dir, 'YELLOW'), '{0}.jpg'.format(st))
+                    self.num_of_yellow = self.num_of_yellow + 1
+                    if self.num_of_yellow > NUM_OF_IMAGE:
+                        is_enough = True
+		elif light.state == TrafficLight.GREEN:
+		    image_path = os.path.join(os.path.join(self.image_dir, 'GREEN'), '{0}.jpg'.format(st))
+                    self.num_of_green = self.num_of_green + 1
+                    if self.num_of_green > NUM_OF_IMAGE:
+                        is_enough = True
+		else:
+		    image_path = os.path.join(os.path.join(self.image_dir, 'UNKNOWN'), '{0}.jpg'.format(st))
+                    self.num_of_unknown = self.num_of_unknown + 1
+                    if self.num_of_unknown > NUM_OF_IMAGE:
+                        is_enough = True
+                if not is_enough:
+		    cv2.imwrite(image_path, cv_image)
+		    rospy.loginfo('saved image %s', image_path)
 
         #Get classification
         #return self.light_classifier.get_classification(cv_image)
