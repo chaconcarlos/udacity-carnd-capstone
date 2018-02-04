@@ -13,6 +13,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
+LOOP_RATE = 20
 
 class TLDetector(object):
     def __init__(self):
@@ -50,7 +51,7 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
-        rospy.spin()
+        #rospy.spin()
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -74,6 +75,8 @@ class TLDetector(object):
         """
         self.has_image = True
         self.camera_image = msg
+
+    def publish(self):
         light_wp, state = self.process_traffic_lights()
 
         '''
@@ -203,14 +206,24 @@ class TLDetector(object):
                     if dist < dist_min:
                         dist_min = dist
                         light_wp = i
+                else:
+                    break
 
 	    #rospy.loginfo("tl_detector - wp %s light %s", self.waypoints[light_wp].pose.pose.position, light.pose.pose.position)
             state = self.get_light_state(light)
             return light_wp, state
         return -1, TrafficLight.UNKNOWN
 
+    def start(self):
+      rospy.loginfo("Traffic Light Detector - Starting")
+      rate = rospy.Rate(LOOP_RATE)
+      while not rospy.is_shutdown():
+        self.publish()
+        rate.sleep()
+
 if __name__ == '__main__':
     try:
-        TLDetector()
+        tl_detector = TLDetector()
+	tl_detector.start()
     except rospy.ROSInterruptException:
         rospy.logerr('Could not start traffic node.')
