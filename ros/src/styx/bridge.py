@@ -141,12 +141,20 @@ class Bridge(object):
 
 
     def publish_controls(self, data):
+        # controls reports not used
+        return
+
+    def publish_controls1(self, data):
         steering, throttle, brake = data['steering_angle'], data['throttle'], data['brake']
         self.publishers['steering_report'].publish(self.create_steer(steering))
         self.publishers['throttle_report'].publish(self.create_float(throttle))
         self.publishers['brake_report'].publish(self.create_float(brake))
 
     def publish_obstacles(self, data):
+        # not used
+        return
+
+    def publish_obstacles1(self, data):
         for obs in data['obstacles']:
             pose = self.create_pose(obs[0], obs[1], obs[2])
             self.publishers['obstacle'].publish(pose)
