@@ -292,9 +292,6 @@ class WaypointUpdater(object):
     stop_distance       = get_distance_from_list(self.map_waypoints, next_waypoint_index, next_stop_index)
     future_waypoints    = []
 
-    rospy.logdebug("My current position: %s", next_waypoint_index - 1)
-    rospy.logdebug("next_stop_index:     %s", next_stop_index)
-
     if (next_stop_index > next_waypoint_index):
       look_ahead_index = min(next_waypoint_index + LOOKAHEAD_WPS, next_stop_index)
       future_waypoints = self.map_waypoints[next_waypoint_index : look_ahead_index]
