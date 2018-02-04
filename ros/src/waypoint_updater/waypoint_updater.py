@@ -23,15 +23,15 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOP_RATE                   = 10  # Hz
-LOOKAHEAD_WPS               = 100 # 200
-DISTANCE_TO_CLOSEST         = 999999999
-STOP_DISTANCE               = 45
-METERS_PER_KILOMETER        = 1000
-SECONDS_PER_HOUR            = 3600
-MAX_ACCELERATION            = 0.8
-MAX_DECELERATION            = 0.2
-NEXT_WAYPOINT_MAX_ANGLE     = math.pi / 4
+LOOP_RATE               = 10  # Hz
+LOOKAHEAD_WPS           = 100 # 200
+DISTANCE_TO_CLOSEST     = 999999999
+STOP_DISTANCE           = 45
+METERS_PER_KILOMETER    = 1000
+SECONDS_PER_HOUR        = 3600
+MAX_ACCELERATION        = 0.8
+MAX_DECELERATION        = 0.2
+NEXT_WAYPOINT_MAX_ANGLE = math.pi / 4
 
 def to_meters_per_second(kilometers_per_hour):
   """
@@ -282,8 +282,6 @@ class WaypointUpdater(object):
         velocity = 0.0
 
       set_waypoint_velocity(waypoint, min(velocity, waypoint.twist.twist.linear.x))
-
-    #rospy.logdebug("========================================")
 
   def publish(self):
     """
