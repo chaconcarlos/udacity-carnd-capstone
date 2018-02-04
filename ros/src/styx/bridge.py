@@ -38,6 +38,8 @@ TYPE = {
     'image':Image
 }
 
+CAMERA_PUBLISH_RATE_HZ = 5
+
 
 class Bridge(object):
     def __init__(self, conf, server):
@@ -63,7 +65,6 @@ class Bridge(object):
         self.publishers = {e.name: rospy.Publisher(e.topic, TYPE[e.type], queue_size=1)
                            for e in conf.publishers}
 
-        self.publish_camera_rate = 1  # HZ
         t = threading.Thread(target=self.publish_camera_worker)
         t.daemon = True
         t.start()
@@ -185,7 +186,7 @@ class Bridge(object):
         self.publishers['dbw_status'].publish(Bool(data))
 
     def publish_camera_worker(self):
-        rate = rospy.Rate(self.publish_camera_rate)
+        rate = rospy.Rate(CAMERA_PUBLISH_RATE_HZ)
         while not rospy.is_shutdown():
             data = self.image_queue.get()
             self.publish_camera(data)
