@@ -59,9 +59,12 @@ class TLDetector(object):
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
+        self.use_classifier = rospy.get_param('~use_classifier')
+        if self.use_classifier:
+            rospy.loginfo('using mobilenet traffic light classifier')
+
         self.has_image = False
         self.start()
-        #rospy.spin()
 
     def pose_cb(self, msg):
         self.has_pose = True
@@ -153,10 +156,17 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
-        #Get classification
-        #return self.light_classifier.get_classification(image)
-        return light.state
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image)
+        rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+
+        # cv2.imwrite("./data/test/test.{}.jpg".format(self.camera_image.header.seq), rgb)
+
+        if self.use_classifier:
+            light_state = self.light_classifier.get_classification(rgb)
+            rospy.loginfo('inference: {} / ground truth {}'.format(light_state, light.state))
+            return light_state
+        else:
+            return light.state
 
     def is_ahead_of(self, pose, x, y):
         """Determines whether a wappoint is ahead of position
