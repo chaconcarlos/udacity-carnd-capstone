@@ -195,7 +195,9 @@ class Bridge(object):
         x_values = []
         y_values = []
         z_values = []
-        for waypoint in data.waypoints:
+        for idx, waypoint in enumerate(data.waypoints):
+            if idx % 10 != 0:
+                continue
             x = waypoint.pose.pose.position.x
             y = waypoint.pose.pose.position.y
             z = waypoint.pose.pose.position.z+0.5
