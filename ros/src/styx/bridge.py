@@ -20,6 +20,9 @@ import base64
 
 import math
 
+import threading
+import Queue
+
 TYPE = {
     'bool': Bool,
     'float': Float,
@@ -52,11 +55,18 @@ class Bridge(object):
         '/final_waypoints': self.callback_path
         }
 
+        self.image_queue = Queue.Queue(1)
+
         self.subscribers = [rospy.Subscriber(e.topic, TYPE[e.type], self.callbacks[e.topic])
                             for e in conf.subscribers]
 
         self.publishers = {e.name: rospy.Publisher(e.topic, TYPE[e.type], queue_size=1)
                            for e in conf.publishers}
+
+        self.publish_camera_rate = 1  # HZ
+        t = threading.Thread(target=self.publish_camera_worker)
+        t.daemon = True
+        t.start()
 
     def create_light(self, x, y, z, yaw, state):
         light = TrafficLight()
@@ -173,6 +183,20 @@ class Bridge(object):
 
     def publish_dbw_status(self, data):
         self.publishers['dbw_status'].publish(Bool(data))
+
+    def publish_camera_worker(self):
+        rate = rospy.Rate(self.publish_camera_rate)
+        while not rospy.is_shutdown():
+            data = self.image_queue.get()
+            self.publish_camera(data)
+            rate.sleep()
+            self.image_queue.task_done()
+
+    def publish_camera_async(self, data):
+        try:
+            self.image_queue.put(data, False)
+        except Queue.Full:
+            pass
 
     def publish_camera(self, data):
         imgString = data["image"]

@@ -61,7 +61,7 @@ def trafficlights(sid, data):
 
 @sio.on('image')
 def image(sid, data):
-    bridge.publish_camera(data)
+    bridge.publish_camera_async(data)
 
 if __name__ == '__main__':
 
