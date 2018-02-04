@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import rospy
+import scipy.spatial
+import numpy as np
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
 from styx_msgs.msg import TrafficLightArray, TrafficLight
@@ -50,18 +52,30 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.has_waypoints = False
+        self.has_pose = False
 
         self.has_image = False
         self.start()
         #rospy.spin()
 
     def pose_cb(self, msg):
+        self.has_pose = True
         self.pose = msg
         #rospy.loginfo("current pose: %s", self.pose)
 
     def waypoints_cb(self, waypoints):
+        if self.has_waypoints:
+            return
+
         self.waypoints = waypoints.waypoints
-        #rospy.loginfo("waypoints: %s", self.waypoints)
+
+        data = np.zeros((len(self.waypoints), 2), dtype=np.float32)
+        for idx, wp in enumerate(self.waypoints):
+            xy = (wp.pose.pose.position.x, wp.pose.pose.position.y)
+            data[idx, :] = xy
+        self.kdtree = scipy.spatial.KDTree(data)
+        self.has_waypoints = True
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -79,6 +93,8 @@ class TLDetector(object):
         self.camera_image = msg
 
     def publish(self):
+        if not (self.has_pose and self.has_waypoints):
+            return
         light_wp, state = self.process_traffic_lights()
 
         '''
@@ -103,6 +119,10 @@ class TLDetector(object):
     def calculate_distance(self, x1, x2, y1, y2):
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
+    def get_closest_waypoint_xy(self, pt):
+        d, kdwp = self.kdtree.query(pt)
+        return kdwp
+
     def get_closest_waypoint_idx(self, pose):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
@@ -113,15 +133,8 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
-        index = -1
-        dist_min = float("inf")
-        for i, wp in enumerate(self.waypoints):
-            dist = self.calculate_distance(pose.position.x, wp.pose.pose.position.x, pose.position.y, wp.pose.pose.position.y)
-            if dist < dist_min:
-                dist_min = dist
-                index = i
-        return index
+        d, kdwp = self.kdtree.query((pose.position.x, pose.position.y))
+        return kdwp
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
@@ -137,7 +150,8 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        # unused for now
+        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         #Get classification
         #return self.light_classifier.get_classification(cv_image)
@@ -202,14 +216,10 @@ class TLDetector(object):
             # Find wp index in waypoints which is closest to the traffic light
             light = self.lights[closest_stop_line_idx]
             dist_min = float('inf')
-            for i, wp in enumerate(self.waypoints):
-                if self.is_ahead_of(wp.pose.pose, stop_line_positions[closest_stop_line_idx][0], stop_line_positions[closest_stop_line_idx][1]):
-                    dist = self.calculate_distance(wp.pose.pose.position.x, stop_line_positions[closest_stop_line_idx][0], wp.pose.pose.position.y, stop_line_positions[closest_stop_line_idx][1])
-                    if dist < dist_min:
-                        dist_min = dist
-                        light_wp = i
-                else:
-                    break
+            wp = self.get_closest_waypoint_xy(stop_line_positions[closest_stop_line_idx])
+            
+            if wp > car_position_idx:
+                light_wp = wp
 
 	    #rospy.loginfo("tl_detector - wp %s light %s", self.waypoints[light_wp].pose.pose.position, light.pose.pose.position)
             state = self.get_light_state(light)
