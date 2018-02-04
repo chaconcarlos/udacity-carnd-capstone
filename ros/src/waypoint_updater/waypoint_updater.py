@@ -23,14 +23,14 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOP_RATE                   = 10 # Hz
-LOOKAHEAD_WPS               = 50 # 200
+LOOP_RATE                   = 10  # Hz
+LOOKAHEAD_WPS               = 100 # 200
 DISTANCE_TO_CLOSEST         = 999999999
-STOP_DISTANCE               = 40
+STOP_DISTANCE               = 45
 METERS_PER_KILOMETER        = 1000
 SECONDS_PER_HOUR            = 3600
-MAX_ACCELERATION            = 1.0 # 8 m/s2 by a rate of 10 Hz
-MAX_DECELERATION            = 0.5   # m/s2
+MAX_ACCELERATION            = 0.8
+MAX_DECELERATION            = 0.2
 NEXT_WAYPOINT_MAX_ANGLE     = math.pi / 4
 
 def to_meters_per_second(kilometers_per_hour):
@@ -47,20 +47,43 @@ def to_meters_per_second(kilometers_per_hour):
 
 def get_distance(position_1, position_2):
   """
-  Gets the distance squared between two positions.
+  Gets the distance between two positions.
 
   Args:
       position_1 (Point): The first point.
       position_2 (Point): The second point.
 
   Returns:
-      The distance between the given points.
+      The distance between the given positions.
   """
   x_coefficient = (position_1.x - position_2.x) ** 2
   y_coefficient = (position_1.y - position_2.y) ** 2
   z_coefficient = (position_1.z - position_2.z) ** 2
 
   return math.sqrt(x_coefficient + y_coefficient  + z_coefficient)
+
+def get_distance_from_list(waypoints, index_waypoint1, index_waypoint2):
+  """
+  Gets the distance between two positions in a waypoint list.
+
+  Args:
+      waypoints  (Waypoint): The waypoints list.
+      index_waypoint1 (Int): The index of the first waypoint.
+      index_waypoint2 (Int): The index of the second waypoint.
+
+  Returns:
+      The distance between the given points.
+  """
+  distance         = 0
+  current_waypoint = index_waypoint1
+
+  for i in range(index_waypoint1, index_waypoint2 + 1):
+    position1 = waypoints[current_waypoint].pose.pose.position
+    position2 = waypoints[i].pose.pose.position
+    distance += get_distance(position1, position2)
+    current_waypoint = i
+
+  return distance
 
 def set_waypoint_velocity(waypoint, velocity):
   """
@@ -82,7 +105,7 @@ class WaypointUpdater(object):
     """
     Initializes an instance of the WaypointUploader class.
     """
-    rospy.init_node('waypoint_updater', log_level = rospy.DEBUG)
+    rospy.init_node('waypoint_updater')
 
     rospy.loginfo("WaypointUpdater - Initializing waypoint updater...")
     rospy.logdebug("WaypointUpdater - Suscribing to channels...")
@@ -144,8 +167,8 @@ class WaypointUpdater(object):
     Args:
         msg (Int32): The index of the traffic waypoint.
     """
-    # TODO: Callback for /traffic_waypoint message. Implement
-    pass
+    self.stop_waypoint_index = msg.data
+    #self.stop_waypoint_index = 800
 
   def on_obstacle_waypoint_received(self, msg):
     """
@@ -222,13 +245,9 @@ class WaypointUpdater(object):
     next_stop_index     = self.map_waypoints_count - 1
     is_valid_stop_index = self.stop_waypoint_index != None and self.stop_waypoint_index > 0
 
-    if (is_valid_stop_index):
-      is_on_range     = self.stop_waypoint_index < self.map_waypoints_count
-      is_ahead        = self.stop_waypoint_index > start_index
+    if (is_valid_stop_index and self.stop_waypoint_index < self.map_waypoints_count):
+      next_stop_index = self.stop_waypoint_index
 
-      if (is_on_range and is_ahead):
-      	next_stop_index = self.stop_waypoint_index
-  	
     return next_stop_index
 
   def accelerate(self, waypoints, target_velocity):
@@ -243,23 +262,28 @@ class WaypointUpdater(object):
       waypoint_velocity = min(self.current_velocity + (i + 1) * MAX_ACCELERATION, target_velocity)
       set_waypoint_velocity(waypoints[i], waypoint_velocity)
 
-  def decelerate(self, waypoints):    
+  def decelerate(self, waypoints, next_stop_index):    
     """
     Sets the target velocity of the waypoints decelerating to stop in the last waypoint.
 
     Args:
         waypoints (List): [out] The waypoints.
     """
-    stop_position = waypoints[len(waypoints) - 1].pose.pose.position
+    set_waypoint_velocity(waypoints[next_stop_index], 0)
 
-    for waypoint in waypoints:
-      distance = get_distance(waypoint.pose.pose.position, stop_position)               
-      velocity = math.sqrt(2 * MAX_DECELERATION * distance)
+    for index, waypoint in enumerate(waypoints):
+      if (index < next_stop_index):
+        distance = get_distance_from_list(waypoints, index, next_stop_index) 
+        velocity = math.sqrt(2 * MAX_DECELERATION * distance)
+      else:
+        velocity = 0
 
-      if (velocity < 1):
-      	velocity = 0.0
+      if (velocity < 1.1):
+        velocity = 0.0
 
-      set_waypoint_velocity(waypoint, velocity)
+      set_waypoint_velocity(waypoint, min(velocity, waypoint.twist.twist.linear.x))
+
+    #rospy.logdebug("========================================")
 
   def publish(self):
     """
@@ -267,21 +291,20 @@ class WaypointUpdater(object):
     """
     next_waypoint_index = self.get_next_waypoint_index()
     next_stop_index     = self.get_next_stop_index(next_waypoint_index)
-    start_position      = self.map_waypoints[next_waypoint_index].pose.pose.position
-    stop_position       = self.map_waypoints[next_stop_index].pose.pose.position
-    stop_distance       = get_distance(start_position, stop_position)
+    stop_distance       = get_distance_from_list(self.map_waypoints, next_waypoint_index, next_stop_index)
     future_waypoints    = []
 
-    if (next_stop_index != next_waypoint_index):
+    rospy.logdebug("My current position: %s", next_waypoint_index - 1)
+    rospy.logdebug("next_stop_index:     %s", next_stop_index)
+
+    if (next_stop_index > next_waypoint_index):
       look_ahead_index = min(next_waypoint_index + LOOKAHEAD_WPS, next_stop_index)
       future_waypoints = self.map_waypoints[next_waypoint_index : look_ahead_index]
-    elif (stop_distance == 0):
-      future_waypoints.append(self.map_waypoints[next_waypoint_index])
 
-    if (stop_distance <= STOP_DISTANCE):
-      self.decelerate(future_waypoints)
-    else:
-      self.accelerate(future_waypoints, self.target_velocity)
+      if (stop_distance <= STOP_DISTANCE):
+        self.decelerate(future_waypoints, len(future_waypoints) - 1)
+      else:
+        self.accelerate(future_waypoints, self.target_velocity)
 
     lane                 = Lane()
     lane.header.frame_id = '/world'

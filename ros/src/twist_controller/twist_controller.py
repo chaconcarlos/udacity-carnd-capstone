@@ -35,15 +35,48 @@ class Controller(object):
     """
     self.pid_controller.reset()
 
-  def get_brake_torque(self, acceleration):
-    return acceleration * self.vehicle_total_mass * self.vehicle.wheel_radius 
+  def get_brake_torque(self, deceleration_rate):
+    """
+    Gets the brake torque value for the current situation of the vehicle.
+    
+    Args:
+        deceleration_rate (Float): The deceleration rate.
 
-  def get_steering(self, target_speed, target_yaw, current_speed):
+    Returns:
+        The brake torque value.
+    """
+    return deceleration_rate * self.vehicle_total_mass * self.vehicle.wheel_radius 
+
+  def get_steering(self, current_speed, target_speed, target_yaw):
+    """
+    Gets the steering control value for the current situation of the vehicle.
+    
+    Args:
+        current_speed (Float): The current speed of the vehicle.
+        target_speed  (Float): The target speed for the vehicle.
+        target_yaw    (Float): The target yaw for the vehicle.
+
+    Returns:
+        The steering control value.
+    """
     steer = self.yaw_controller.get_steering(target_speed, target_yaw, current_speed)
     steer = self.steer_lpf.filt(steer)
+
     return steer
   
   def get_dynamics(self, current_speed, target_speed, sample_time):
+    """
+    Gets the brake and throttle control values for the current situation of
+    the vehicle.
+    
+    Args:
+        current_speed (Float): The current speed of the vehicle.
+        target_speed  (Float): The target speed for the vehicle.
+        sample_time   (Float): The sample timestamp in linux epoch.
+
+    Returns:
+        The throttle and brake control values.
+    """
     speed_error  = target_speed - current_speed
     acceleration = self.pid_controller.step(speed_error, sample_time)
     acceleration = self.throttle_lpf.filt(acceleration)
@@ -63,12 +96,24 @@ class Controller(object):
     return throttle, brake
   
   def get_controls(self, current_speed, target_speed, target_yaw, sample_time):
-    # Return throttle, brake, steer
-    steer = self.get_steering(target_speed, target_yaw, current_speed)
+    """
+    Gets the throttle, brake and steer control values for the current situation of
+    the vehicle.
+    
+    Args:
+        current_speed (Float): The current speed of the vehicle.
+        target_speed  (Float): The target speed for the vehicle.
+        target_yaw    (Float): The target yaw for the vehicle.
+        sample_time   (Float): The sample timestamp in linux epoch.
+
+    Returns:
+        The throttle, brake and steer control values.
+    """
+    steer = self.get_steering(current_speed, target_speed, target_yaw)
 
     if (current_speed < 1 and target_speed == 0):
       throttle = 0
-      brake    = 2000
+      brake    = 200
     else:
       throttle, brake = self.get_dynamics(current_speed, target_speed, sample_time)
     
