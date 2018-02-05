@@ -1,4 +1,3 @@
-
 import rospy
 
 import tf
@@ -7,7 +6,7 @@ from dbw_mkz_msgs.msg import SteeringReport, ThrottleCmd, BrakeCmd, SteeringCmd
 from std_msgs.msg import Float32 as Float
 from std_msgs.msg import Bool
 from sensor_msgs.msg import PointCloud2
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 import sensor_msgs.point_cloud2 as pcl2
 from std_msgs.msg import Header
 from cv_bridge import CvBridge, CvBridgeError
@@ -35,7 +34,8 @@ TYPE = {
     'brake_cmd': BrakeCmd,
     'throttle_cmd': ThrottleCmd,
     'path_draw': Lane,
-    'image':Image
+    'image': Image
+    # 'image': CompressedImage
 }
 
 CAMERA_PUBLISH_RATE_HZ = 5
@@ -54,16 +54,14 @@ class Bridge(object):
             '/vehicle/steering_cmd': self.callback_steering,
             '/vehicle/throttle_cmd': self.callback_throttle,
             '/vehicle/brake_cmd': self.callback_brake,
-        '/final_waypoints': self.callback_path
+            '/final_waypoints': self.callback_path
         }
 
         self.image_queue = Queue.Queue(1)
 
-        self.subscribers = [rospy.Subscriber(e.topic, TYPE[e.type], self.callbacks[e.topic])
-                            for e in conf.subscribers]
+        self.subscribers = [rospy.Subscriber(e.topic, TYPE[e.type], self.callbacks[e.topic]) for e in conf.subscribers]
 
-        self.publishers = {e.name: rospy.Publisher(e.topic, TYPE[e.type], queue_size=1)
-                           for e in conf.publishers}
+        self.publishers = {e.name: rospy.Publisher(e.topic, TYPE[e.type], queue_size=1) for e in conf.publishers}
 
         t = threading.Thread(target=self.publish_camera_worker)
         t.daemon = True
@@ -92,7 +90,7 @@ class Bridge(object):
         pose.pose.position.y = y
         pose.pose.position.z = z
 
-        q = tf.transformations.quaternion_from_euler(0., 0., math.pi * yaw/180.)
+        q = tf.transformations.quaternion_from_euler(0., 0., math.pi * yaw / 180.)
         pose.pose.orientation = Quaternion(*q)
 
         return pose
@@ -110,7 +108,7 @@ class Bridge(object):
 
     def create_steer(self, val):
         st = SteeringReport()
-        st.steering_wheel_angle_cmd = val * math.pi/180.
+        st.steering_wheel_angle_cmd = val * math.pi / 180.
         st.enabled = True
         st.speed = self.vel
         return st
@@ -118,7 +116,7 @@ class Bridge(object):
     def calc_angular(self, yaw):
         angular_vel = 0.
         if self.yaw is not None:
-            angular_vel = (yaw - self.yaw)/(rospy.get_time() - self.prev_time)
+            angular_vel = (yaw - self.yaw) / (rospy.get_time() - self.prev_time)
         self.yaw = yaw
         self.prev_time = rospy.get_time()
         return angular_vel
@@ -132,24 +130,19 @@ class Bridge(object):
 
     def broadcast_transform(self, name, position, orientation):
         br = tf.TransformBroadcaster()
-        br.sendTransform(position,
-            orientation,
-            rospy.Time.now(),
-            name,
-            "world")
+        br.sendTransform(position, orientation, rospy.Time.now(), name, "world")
 
     def publish_odometry(self, data):
         pose = self.create_pose(data['x'], data['y'], data['z'], data['yaw'])
 
         position = (data['x'], data['y'], data['z'])
-        orientation = tf.transformations.quaternion_from_euler(0, 0, math.pi * data['yaw']/180.)
+        orientation = tf.transformations.quaternion_from_euler(0, 0, math.pi * data['yaw'] / 180.)
         self.broadcast_transform("base_link", position, orientation)
 
         self.publishers['current_pose'].publish(pose)
-        self.vel = data['velocity']* 0.44704
-        self.angular = self.calc_angular(data['yaw'] * math.pi/180.)
+        self.vel = data['velocity'] * 0.44704
+        self.angular = self.calc_angular(data['yaw'] * math.pi / 180.)
         self.publishers['current_velocity'].publish(self.create_twist(self.vel, self.angular))
-
 
     def publish_controls(self, data):
         # controls reports not used
@@ -176,7 +169,8 @@ class Bridge(object):
         self.publishers['obstacle_points'].publish(cloud)
 
     def publish_lidar(self, data):
-        self.publishers['lidar'].publish(self.create_point_cloud_message(zip(data['lidar_x'], data['lidar_y'], data['lidar_z'])))
+        self.publishers['lidar'].publish(
+            self.create_point_cloud_message(zip(data['lidar_x'], data['lidar_y'], data['lidar_z'])))
 
     def publish_traffic(self, data):
         x, y, z = data['light_pos_x'], data['light_pos_y'], data['light_pos_z'],
@@ -212,7 +206,7 @@ class Bridge(object):
         image = PIL_Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
 
-        image_message = self.bridge.cv2_to_imgmsg(image_array, encoding="rgb8")
+        image_message = self.bridge.cv2_to_imgmsg(image_array)
         self.publishers['image'].publish(image_message)
 
     def callback_steering(self, data):
@@ -233,7 +227,7 @@ class Bridge(object):
                 continue
             x = waypoint.pose.pose.position.x
             y = waypoint.pose.pose.position.y
-            z = waypoint.pose.pose.position.z+0.5
+            z = waypoint.pose.pose.position.z + 0.5
             x_values.append(x)
             y_values.append(y)
             z_values.append(z)

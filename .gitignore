@@ -4,3 +4,5 @@ build
 devel
 
 profile.tmp
+**/**/*.jpg
+ros/tensorflow/tf_files/**/*
