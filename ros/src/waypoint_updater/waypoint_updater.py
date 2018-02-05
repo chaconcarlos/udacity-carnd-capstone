@@ -3,6 +3,8 @@
 import math
 import rospy
 import tf
+import scipy.spatial
+import numpy as np
 
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg     import Lane, Waypoint
@@ -30,7 +32,7 @@ STOP_DISTANCE           = 45
 METERS_PER_KILOMETER    = 1000
 SECONDS_PER_HOUR        = 3600
 MAX_ACCELERATION        = 0.8
-MAX_DECELERATION        = 0.2
+MAX_DECELERATION        = 0.25
 NEXT_WAYPOINT_MAX_ANGLE = math.pi / 4
 
 def to_meters_per_second(kilometers_per_hour):
@@ -128,6 +130,7 @@ class WaypointUpdater(object):
     self.map_waypoints       = None
     self.last_closest_index  = 0
     self.stop_waypoint_index = None
+    self.is_map_initialized  = False
 
     rospy.logdebug("WaypointUpdater - Target_speed set to %s. m/s", self.target_velocity)
     rospy.loginfo("WaypointUpdater - Waypoint updater initialization finished.")
@@ -160,6 +163,15 @@ class WaypointUpdater(object):
     self.map_waypoints       = lane.waypoints
     self.map_waypoints_count = len(self.map_waypoints)
 
+    data = np.zeros((len(self.map_waypoints), 2), dtype = np.float32)
+
+    for index, waypoint in enumerate(self.map_waypoints):
+        coordinates  = (waypoint.pose.pose.position.x, waypoint.pose.pose.position.y)
+        data[index, : ] = coordinates
+    
+    self.kdtree = scipy.spatial.KDTree(data)
+    self.is_map_initialized = True
+
   def on_traffic_waypoint_received(self, msg):
     """
     Handles the event when the a traffic waypoint has been received.
@@ -168,7 +180,6 @@ class WaypointUpdater(object):
         msg (Int32): The index of the traffic waypoint.
     """
     self.stop_waypoint_index = msg.data
-    #self.stop_waypoint_index = 800
 
   def on_obstacle_waypoint_received(self, msg):
     """
@@ -187,24 +198,9 @@ class WaypointUpdater(object):
     Returns:
         The index of the closest waypoint to the current position.
     """
-    current_min_distance = DISTANCE_TO_CLOSEST
-    closest_index        = self.last_closest_index
-    current_position     = self.current_pose.position
-
-    for i in range(self.map_waypoints_count - closest_index):
-      index             = self.last_closest_index + i
-      waypoint_position = self.map_waypoints[index].pose.pose.position 
-      distance          = get_distance(current_position, waypoint_position)
-
-      if (distance < current_min_distance):
-        current_min_distance = distance
-        closest_index        = index
-      else:
-        break
-
-    self.last_closest_index = closest_index
-
-    return closest_index
+    current_position = self.current_pose.position
+    _, index         = self.kdtree.query((current_position.x, current_position.y))
+    return index
 
   def get_next_waypoint_index(self):
     """
@@ -317,7 +313,7 @@ class WaypointUpdater(object):
     rate = rospy.Rate(LOOP_RATE)
     
     while not rospy.is_shutdown():
-      if (self.map_waypoints != None and self.current_pose != None):
+      if (self.is_map_initialized and self.current_pose != None):
         self.publish()
 
       rate.sleep()
