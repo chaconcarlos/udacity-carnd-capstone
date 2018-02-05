@@ -156,8 +156,7 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image)
-        rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        rgb = self.bridge.imgmsg_to_cv2(self.camera_image)
 
         # cv2.imwrite("./data/test/test.{}.jpg".format(self.camera_image.header.seq), rgb)
 
