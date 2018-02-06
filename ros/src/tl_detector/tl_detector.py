@@ -41,10 +41,12 @@ class TLDetector(object):
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
 
-        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
+        self.upcoming_red_light_pub = rospy.Publisher(
+            '/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier('./tf_files/retrained_graph.pb', './tf_files/retrained_labels.txt')
+        self.light_classifier = TLClassifier('./tf_files/retrained_graph.pb',
+                                             './tf_files/retrained_labels.txt')
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -56,9 +58,15 @@ class TLDetector(object):
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
+        sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray,
+                                self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
+        self.save_images_min_dist = rospy.get_param('~save_images_min_dist')
+        rospy.loginfo('save img min dist: {}'.format(
+            self.save_images_min_dist))
+
+        self.save_images = rospy.get_param('~save_images')
         self.use_classifier = rospy.get_param('~use_classifier')
         if self.use_classifier:
             rospy.loginfo('using mobilenet traffic light classifier')
@@ -69,7 +77,6 @@ class TLDetector(object):
     def pose_cb(self, msg):
         self.has_pose = True
         self.pose = msg
-        #rospy.loginfo("current pose: %s", self.pose)
 
     def waypoints_cb(self, waypoints):
         if self.has_waypoints:
@@ -86,7 +93,6 @@ class TLDetector(object):
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
-        #rospy.loginfo("lights: %s", self.lights)
 
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
@@ -109,7 +115,8 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
-        #rospy.loginfo("tl_detector - publishing state: %s light_wp %s", state, light_wp)
+        rospy.loginfo("tl_detector - publishing state: %s light_wp %s", state,
+                      light_wp)
         if self.state != state:
             self.state_count = 0
             self.state = state
@@ -158,14 +165,25 @@ class TLDetector(object):
 
         rgb = self.bridge.imgmsg_to_cv2(self.camera_image)
 
-        # cv2.imwrite("./data/test/test.{}.jpg".format(self.camera_image.header.seq), rgb)
-
         if self.use_classifier:
             light_state = self.light_classifier.get_classification(rgb)
-            rospy.loginfo('inference: {} / ground truth {}'.format(light_state, light.state))
-            return light_state
+            rospy.loginfo('inference: {} / ground truth {}'.format(
+                light_state, light.state))
         else:
-            return light.state
+            light_state = light.state
+
+        if self.save_images:
+            dist_to_light = self.calculate_distance(
+                self.pose.pose.position.x, light.pose.pose.position.x,
+                self.pose.pose.position.y, light.pose.pose.position.y)
+
+            if dist_to_light <= self.save_images_min_dist:
+                bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                cv2.imwrite("./data/test/test-{}-{}.{}.jpg".format(
+                    light_state, light.state, self.camera_image.header.seq),
+                            bgr)
+
+        return light_state
 
     def is_ahead_of(self, pose, x, y):
         """Determines whether a wappoint is ahead of position
@@ -179,7 +197,8 @@ class TLDetector(object):
         x1 = pose.position.x
         y1 = pose.position.y
         orientation = pose.orientation
-        euler = tf.transformations.euler_from_quaternion([orientation.x, orientation.y, orientation.z, orientation.w])
+        euler = tf.transformations.euler_from_quaternion(
+            [orientation.x, orientation.y, orientation.z, orientation.w])
         yaw = euler[2]
         return ((x - x1) * math.cos(yaw) + (y - y1) * math.sin(yaw)) > 0
 
@@ -200,8 +219,6 @@ class TLDetector(object):
         if not self.lights:
             return -1, TrafficLight.UNKNOWN
 
-#rospy.loginfo("tl_detector - waypoints len: %s light num %s", len(self.waypoints), len(self.lights))
-# List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
         car_position_idx = 0
         if (self.pose):
@@ -214,26 +231,25 @@ class TLDetector(object):
         dist_min = float('inf')
         closest_stop_line_idx = -1
         for i, stop_line_pose in enumerate(stop_line_positions):
-            if self.is_ahead_of(car_position.pose.pose, stop_line_pose[0], stop_line_pose[1]):
-                dist = self.calculate_distance(car_position.pose.pose.position.x, stop_line_pose[0],
-                                               car_position.pose.pose.position.y, stop_line_pose[1])
+            if self.is_ahead_of(car_position.pose.pose, stop_line_pose[0],
+                                stop_line_pose[1]):
+                dist = self.calculate_distance(
+                    car_position.pose.pose.position.x, stop_line_pose[0],
+                    car_position.pose.pose.position.y, stop_line_pose[1])
                 if dist < dist_min:
                     dist_min = dist
                     closest_stop_line_idx = i
-
-#rospy.loginfo("tl_detector - stop line %s %s", stop_line_positions[closest_stop_line_idx], len(stop_line_positions))
 
         if closest_stop_line_idx >= 0:
             # Find wp index in waypoints which is closest to the traffic light
             light = self.lights[closest_stop_line_idx]
             dist_min = float('inf')
-            wp = self.get_closest_waypoint_xy(stop_line_positions[closest_stop_line_idx])
+            wp = self.get_closest_waypoint_xy(
+                stop_line_positions[closest_stop_line_idx])
 
             if wp > car_position_idx:
                 light_wp = wp
 
-
-#rospy.loginfo("tl_detector - wp %s light %s", self.waypoints[light_wp].pose.pose.position, light.pose.pose.position)
             state = self.get_light_state(light)
             return light_wp, state
         return -1, TrafficLight.UNKNOWN
@@ -245,6 +261,7 @@ class TLDetector(object):
             if self.has_image:
                 self.publish()
             rate.sleep()
+
 
 if __name__ == '__main__':
     try:
