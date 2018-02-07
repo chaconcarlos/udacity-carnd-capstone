@@ -68,6 +68,7 @@ class TLDetector(object):
 
         self.save_images = rospy.get_param('~save_images')
         self.use_classifier = rospy.get_param('~use_classifier')
+        self.max_tl_dist = rospy.get_param('~max_tl_distance')
         if self.use_classifier:
             rospy.loginfo('using mobilenet traffic light classifier')
 
@@ -240,7 +241,7 @@ class TLDetector(object):
                     dist_min = dist
                     closest_stop_line_idx = i
 
-        if closest_stop_line_idx >= 0:
+        if dist_min < self.max_tl_dist and closest_stop_line_idx >= 0:
             # Find wp index in waypoints which is closest to the traffic light
             light = self.lights[closest_stop_line_idx]
             dist_min = float('inf')
