@@ -4,5 +4,6 @@
         <param name="save_images" type="bool" value="false" />
         <param name="save_images_min_dist" type="double" value="150.0" />
         <param name="use_classifier" type="bool" value="true" />
+        <param name="max_tl_distance" type="double" value="200.0" />
     </node>
 </launch>
