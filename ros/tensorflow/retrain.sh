@@ -13,5 +13,5 @@ python -m tf.retrain \
 --summaries_dir=tf_files/training_summaries/"${ARCHITECTURE}" \
 --output_graph=../src/tl_detector/tf_files/retrained_graph.pb \
 --output_labels=../src/tl_detector/tf_files/retrained_labels.txt \
---image_dir=../src/tl_detector/data \
---architecture="${ARCHITECTURE}"
+--image_dir=../src/tl_detector/data
+# --architecture="${ARCHITECTURE}"

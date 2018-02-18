@@ -13,11 +13,11 @@ import tensorflow as tf
 
 
 class TLClassifier(object):
-    input_height = 224
-    input_width = 224
+    input_height = 299
+    input_width = 299
     input_mean = 128
     input_std = 128
-    input_layer = "input"
+    input_layer = "Mul"
     output_layer = "final_result"
 
     def __init__(self, tf_graph, tf_labels):
@@ -35,10 +35,10 @@ class TLClassifier(object):
         self.input_operation = self.graph.get_operation_by_name(input_name)
         self.output_operation = self.graph.get_operation_by_name(output_name)
         self.label2trafficLightState = {
-            'green': TrafficLight.GREEN,
+            'nonred': TrafficLight.GREEN,
             'red': TrafficLight.RED,
-            'yellow': TrafficLight.YELLOW,
-            'none': TrafficLight.UNKNOWN
+            # 'yellow': TrafficLight.YELLOW,
+            # 'none': TrafficLight.UNKNOWN
         }
         rospy.loginfo(self.label2trafficLightState)
 
@@ -60,10 +60,15 @@ class TLClassifier(object):
         return label
 
     @staticmethod
-    def tensor_from_rgb_img(rgb, input_height=299, input_width=299, input_mean=0, input_std=255):
+    def tensor_from_rgb_img(rgb,
+                            input_height=299,
+                            input_width=299,
+                            input_mean=0,
+                            input_std=255):
         float_caster = tf.cast(rgb, tf.float32)
         dims_expander = tf.expand_dims(float_caster, 0)
-        resized = tf.image.resize_bilinear(dims_expander, [input_height, input_width])
+        resized = tf.image.resize_bilinear(dims_expander,
+                                           [input_height, input_width])
         normalized = tf.divide(tf.subtract(resized, [input_mean]), [input_std])
         sess = tf.Session()
         result = sess.run(normalized)
@@ -90,12 +95,15 @@ class TLClassifier(object):
 
         with tf.Session(graph=self.graph) as sess:
             start = time.time()
-            results = sess.run(self.output_operation.outputs[0], {self.input_operation.outputs[0]: t})
+            results = sess.run(self.output_operation.outputs[0], {
+                self.input_operation.outputs[0]: t
+            })
             end = time.time()
             rospy.loginfo('image classified in {:.3f}s'.format(end - start))
 
         results = np.squeeze(results)
         top_k = results.argsort()[-5:][::-1]
         label = self.labels[top_k[0]]
-        rospy.loginfo("TLClassifier best guess {}: {}".format(label, results[top_k[0]]))
+        rospy.loginfo("TLClassifier best guess {}: {}".format(
+            label, results[top_k[0]]))
         return self.label2trafficLightState[label]

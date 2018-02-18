@@ -116,8 +116,8 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
-        rospy.loginfo("tl_detector - publishing state: %s light_wp %s", state,
-                      light_wp)
+        # rospy.loginfo("tl_detector - publishing state: %s light_wp %s", state,
+        #   light_wp)
         if self.state != state:
             self.state_count = 0
             self.state = state
