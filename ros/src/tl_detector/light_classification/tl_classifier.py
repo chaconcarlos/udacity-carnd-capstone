@@ -11,7 +11,6 @@ import tensorflow as tf
 # red
 # yellow
 
-
 class TLClassifier(object):
     input_height = 299
     input_width = 299
@@ -99,11 +98,11 @@ class TLClassifier(object):
                 self.input_operation.outputs[0]: t
             })
             end = time.time()
-            rospy.loginfo('image classified in {:.3f}s'.format(end - start))
+            rospy.logdebug('image classified in {:.3f}s'.format(end - start))
 
         results = np.squeeze(results)
         top_k = results.argsort()[-5:][::-1]
         label = self.labels[top_k[0]]
-        rospy.loginfo("TLClassifier best guess {}: {}".format(
+        rospy.logdebug("TLClassifier best guess {}: {}".format(
             label, results[top_k[0]]))
         return self.label2trafficLightState[label]
