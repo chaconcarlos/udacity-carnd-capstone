@@ -69,6 +69,7 @@ class TLDetector(object):
         self.save_images = rospy.get_param('~save_images')
         self.use_classifier = rospy.get_param('~use_classifier')
         self.max_tl_dist = rospy.get_param('~max_tl_distance')
+        
         if self.use_classifier:
             rospy.loginfo('using mobilenet traffic light classifier')
 
@@ -168,7 +169,7 @@ class TLDetector(object):
 
         if self.use_classifier:
             light_state = self.light_classifier.get_classification(rgb)
-            rospy.loginfo('inference: {} / ground truth {}'.format(
+            rospy.logdebug('inference: {} / ground truth {}'.format(
                 light_state, light.state))
         else:
             light_state = light.state
