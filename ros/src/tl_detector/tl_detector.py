@@ -17,6 +17,7 @@ import io
 from PIL import Image as PIL_Image
 import numpy as np
 import uuid
+from matplotlib import pyplot as plt
 
 STATE_COUNT_THRESHOLD = 3
 LOOP_RATE = 20
@@ -69,9 +70,11 @@ class TLDetector(object):
         self.save_images = rospy.get_param('~save_images')
         self.use_classifier = rospy.get_param('~use_classifier')
         self.max_tl_dist = rospy.get_param('~max_tl_distance')
-        
+
+        # Always use classifier
+        self.use_classifier = True
         if self.use_classifier:
-            rospy.loginfo('using mobilenet traffic light classifier')
+            rospy.loginfo('using traffic light classifier')
 
         self.has_image = False
         self.start()
@@ -168,10 +171,18 @@ class TLDetector(object):
         rgb = self.bridge.imgmsg_to_cv2(self.camera_image)
 
         if self.use_classifier:
-            light_state = self.light_classifier.get_classification(rgb)
-            rospy.logdebug('inference: {} / ground truth {}'.format(
+            light_state, hsv, thresh_red = self.light_classifier.get_classification(
+                rgb)
+            # Save images for visual debugging
+            # plt.imsave("./data/out-{}-{}.{}.hsv.jpg".format(
+            #     light_state, light.state, self.camera_image.header.seq), hsv)
+            # plt.imsave("./data/out-{}-{}.{}.thresh_red.jpg".format(
+            #     light_state, light.state, self.camera_image.header.seq),
+            #            thresh_red)
+            rospy.loginfo('inference: {} / ground truth {}'.format(
                 light_state, light.state))
         else:
+            rospy.loginfo("use classifier is ", self.use_classifier)
             light_state = light.state
 
         if self.save_images:
@@ -242,7 +253,8 @@ class TLDetector(object):
                     dist_min = dist
                     closest_stop_line_idx = i
 
-        if dist_min < self.max_tl_dist and closest_stop_line_idx >= 0:
+        # if dist_min < self.max_tl_dist and closest_stop_line_idx >= 0:
+        if closest_stop_line_idx >= 0:
             # Find wp index in waypoints which is closest to the traffic light
             light = self.lights[closest_stop_line_idx]
             dist_min = float('inf')

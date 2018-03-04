@@ -5,11 +5,13 @@ import rospy
 from styx_msgs.msg import TrafficLight
 import numpy as np
 import tensorflow as tf
+import cv2
 
 # green
 # none
 # red
 # yellow
+
 
 class TLClassifier(object):
     input_height = 299
@@ -74,7 +76,7 @@ class TLClassifier(object):
 
         return result
 
-    def get_classification(self, rgb_image):
+    def _get_classification(self, rgb_image):
         """Determines the color of the traffic light in the image
 
         Args:
@@ -106,3 +108,45 @@ class TLClassifier(object):
         rospy.logdebug("TLClassifier best guess {}: {}".format(
             label, results[top_k[0]]))
         return self.label2trafficLightState[label]
+
+    def get_classification(self, rgb_image):
+        """Determines the color of the traffic light in the image
+
+        Args:
+            image (cv::Mat): image containing the traffic light in RGB color format
+
+        Returns:
+            int: ID of traffic light color (specified in styx_msgs/TrafficLight)
+
+        """
+        # threshold red pixels in hsv space
+
+        hsv = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
+
+        # thresholds and parameters
+        # below taken from https://github.com/carnd-teambacon/CarND-Capstone
+        # Thresholds for red in HSV color space
+        low_red = np.array([0, 50, 50])
+        high_red = np.array([10, 255, 255])
+        red1 = cv2.inRange(hsv, low_red, high_red)
+        low_red = np.array([170, 50, 50])
+        high_red = np.array([180, 255, 255])
+        red2 = cv2.inRange(hsv, low_red, high_red)
+
+        converted_img = cv2.addWeighted(red1, 1.0, red2, 1.0, 0.0)
+        # Add Gaussian blur for better edge detection
+        blur_img = cv2.GaussianBlur(converted_img, (15, 15), 0)
+        # Apply Hough transform to search for circles
+        detected_circles = cv2.HoughCircles(
+            blur_img,
+            cv2.HOUGH_GRADIENT,
+            0.5,
+            41,
+            param1=70,
+            param2=30,
+            minRadius=5,
+            maxRadius=150)
+
+        if detected_circles is not None:
+            return TrafficLight.RED, hsv, blur_img
+        return TrafficLight.GREEN, hsv, blur_img
